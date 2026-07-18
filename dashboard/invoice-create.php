@@ -246,7 +246,7 @@ $dueDate = date('Y-m-d', strtotime('+30 days'));
                     </div>
 
                     <!-- Invoice Preview -->
-                    <div class="invoice-preview">
+                    <div class="invoice-preview" id="invoicePreview">
                         <div class="invoice-header">
                             <div style="text-align: center; margin-bottom: 10px;">
                                 <i class="fas fa-file-invoice-dollar" style="font-size: 32px; color: #667eea;"></i>
@@ -473,17 +473,81 @@ $dueDate = date('Y-m-d', strtotime('+30 days'));
             }
         }
 
-        // Generate PDF
+        // Generate PDF with proper error handling and validation
         function generatePDF() {
-            const element = document.querySelector('.invoice-preview');
-            const opt = {
-                margin: 10,
-                filename: document.getElementById('invoiceNumber').value + '.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-            };
-            html2pdf().set(opt).from(element).save();
+            try {
+                // Validate that customer name and at least one line item exist
+                const customerName = document.getElementById('customerName').value.trim();
+                const lineItems = document.querySelectorAll('.item-row');
+                let hasValidItems = false;
+
+                lineItems.forEach(row => {
+                    const desc = row.querySelector('.item-description').value.trim();
+                    const qty = row.querySelector('.item-quantity').value;
+                    const rate = row.querySelector('.item-rate').value;
+                    if (desc && qty && rate) {
+                        hasValidItems = true;
+                    }
+                });
+
+                if (!customerName) {
+                    alert('Please enter a customer name.');
+                    return;
+                }
+
+                if (!hasValidItems) {
+                    alert('Please add at least one line item with description, quantity, and rate.');
+                    return;
+                }
+
+                // Get the invoice preview element
+                const element = document.getElementById('invoicePreview');
+                if (!element) {
+                    alert('Invoice preview not found. Please refresh the page.');
+                    return;
+                }
+
+                // Clone the element to avoid modifying the original
+                const clonedElement = element.cloneNode(true);
+
+                // Remove Font Awesome icons from the clone (they won't render in PDF)
+                clonedElement.querySelectorAll('i.fas').forEach(icon => {
+                    icon.remove();
+                });
+
+                // Configure PDF options
+                const filename = document.getElementById('invoiceNumber').value + '.pdf';
+                const opt = {
+                    margin: 10,
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { 
+                        scale: 2,
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#ffffff'
+                    },
+                    jsPDF: { 
+                        orientation: 'portrait', 
+                        unit: 'mm', 
+                        format: 'a4'
+                    }
+                };
+
+                // Generate and save PDF
+                html2pdf()
+                    .set(opt)
+                    .from(clonedElement)
+                    .save()
+                    .catch(error => {
+                        console.error('PDF generation error:', error);
+                        alert('Error generating PDF. Please try again.');
+                    });
+
+            } catch (error) {
+                console.error('Error in generatePDF:', error);
+                alert('An unexpected error occurred while generating the PDF.');
+            }
         }
 
         // Handle form submission
